@@ -1,0 +1,110 @@
+---
+title: "Miniproject 1"
+author: "Jeppe Dreyer Matzen"
+date: "3/3/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+if (!require("tidyverse")) install.packages("tidyverse")
+library(tidyverse)
+if (!require("scales")) install.packages("scales")
+library(scales)
+if (!require("haven")) install.packages("haven")
+library(haven) # Import Stata
+if (!require("janitor")) install.packages("janitor")
+library(janitor)
+if (!require("rstatix")) install.packages("rstatix")
+library(rstatix)
+if (!require("car")) install.packages("car")
+library(car) # for levene's test
+if (!require("broom")) install.packages("broom")
+library(broom)
+```
+
+
+# Experiment:
+The lung function was examined in a study of 636 children in the age of 7 to 10 years in a suburb of Lima, Peru.
+Research question: Do the lung function depend on age, sex, height and shortness of breath?
+A description of the data is found on the next page (KS11_1 FEV1.dta).
+
+## - present a research question
+
+## - argument for and choose the relevant descriptive statistics and test method
+
+## - present and comment the descriptive statistics
+
+## - do the tests in detail
+
+```{r}
+ks11 <- read_dta("Data/KS11_1 FEV1.dta") %>% 
+    janitor::clean_names()
+
+ks11 <- ks11 %>% 
+    mutate(sex = ifelse(sex == 0, yes="girl", no="boy"),
+           respsymptoms = ifelse(respsymptoms == 0, "no_symptoms", "symptoms"),
+           respsymptoms = factor(respsymptoms),
+           sex = factor(sex),
+           fev1_cat = ifelse(fev1_cat == 0, "<=1,60", ">1,60"),
+           fev1_cat = factor(fev1_cat),
+           agegroup = ifelse(agegroup == 0, "<=8,5", ifelse( agegroup == 1, "8,5–9,5", " >=9,5")),
+           factor(ks11$agegroup, levels = c("<=8,5", "8,5–9,5", " >=9,5")))
+str(ks11)
+```
+
+
+#  1. Do a multiple linear regression (only estimation and test of the estimates) with fev1 as the dependent variable and sex and respsymptoms as independent variables. Compare the result with the result from exercise 8.
+
+4.  Estimation and testing
+-   overall test of the model (when there are more than independent variable)
+```{r}
+model1 <- lm(fev1 ~ sex + respsymptoms, data = ks11)
+summary(model1)
+```
+$y^ = 1.68807 -0.11466 * sexgirl - 0.14485 * respsymptomssymptoms$
+Multiple R-squared:  0.07793
+Both sex and respsymptoms is significant. 
+
+-   test of the individual parameters (according to the expectations)
+
+-   interpretation of the parameters (βi - what about β0?)
+
+There is no difference between the anova and the multible 
+
+# 2. Do a multiple linear regression with fev1 as the dependent variable and age, height, sex and respsymptoms as independent variables.
+
+
+## Describe and comment the correlation between the variables with use of plots, numbers and ta-bles.
+
+# 3. Do a multiple linear regression with fev1 as the dependent variable and agegroup, height, sex and respsymptoms as independent variables. Compare the results with the result in question 1.
+
+# 4. Do a multiple linear regression with fev1 as the dependent variable and height, respsymptoms and interaction (height*respsymptoms) as independent variables.
+
+## Try more simple models and choose the best model.
+
+# 5. Do a logistic regression with fev1_cat as the dependent variable and agegroup, height, sex and respsymptoms as independent variables. Compare with the result in question 2.
+
+```{r}
+no_girl <- ks11 %>% 
+    filter(respsymptoms == "no_symptoms", sex == 'girl')
+no_girl
+no_girl_tab <- xtabs(~agegroup + fev1_cat, data = no_girl ) 
+oddsratio(no_girl_tab)
+
+```
+
+
+
+```{r}
+fit <- glm(fev1_cat ~ respsymptoms + sex + height + agegroup, data = ks11, family = binomial)
+
+```
+
+- present a research question
+
+- argument for and choose the relevant descriptive statistics and test method
+
+- present and comment the descriptive statistics
+
+- do the tests in detail

@@ -1,0 +1,56 @@
+---
+title: "Lesson 1 - Bio"
+author: "Jeppe Dreyer Matzen"
+date: "1/31/2021"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(scales)
+library(haven) # Import Stata
+```
+
+# Exercise 1. T-test - Two independent group
+
+```{r}
+
+smok <- read_dta("Data/KS7_2_BirthW_Smoking.dta") %>% 
+    janitor::clean_names() 
+head(KS7_2_BirthW_Smoking) 
+```
+
+
+## a. The scale of the two variables?
+```{r}
+smok %>% 
+    summary()
+```
+
+
+## b. Descriptive statistics: Draw by means of Stata a Box plot - what do you see from the plot?
+
+## c. Test: Investigate by means of a hypothesis test in Stata if there is a significant difference in the means among smokers and non-smokers (α = 1%)
+
+including
+
+- what is the reason for using this method?
+
+- assumptions
+
+- hypotheses
+
+- test statistic and distribution
+
+- p-value
+
+- what is the conclusion?
+
+## d. Find a 99 % confidence interval for the difference between the means (see output from question c above)
+
+- Interpret the confidence interval and compare it with the conclusion on the hypothesis test
+
+## e. Assumptions: Is Weight normal distributed and are there variance homogeneity (in both groups)? 
