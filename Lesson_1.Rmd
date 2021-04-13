@@ -2,55 +2,1992 @@
 title: "Lesson 1 - Bio"
 author: "Jeppe Dreyer Matzen"
 date: "1/31/2021"
-output: pdf_document
+output: 
+  pdf_document: 
+    toc: yes
 editor_options: 
   chunk_output_type: console
+  markdown: 
+    wrap: 72
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+if (!require("tidyverse")) install.packages("tidyverse")
 library(tidyverse)
+if (!require("scales")) install.packages("scales")
 library(scales)
+if (!require("haven")) install.packages("haven")
 library(haven) # Import Stata
+if (!require("janitor")) install.packages("janitor")
+library(janitor)
+if (!require("rstatix")) install.packages("rstatix")
+library(rstatix)
+if (!require("car")) install.packages("car")
+library(car) # for levene's test
+if (!require("broom")) install.packages("broom")
+library(broom)
+if (!require("emmeans")) install.packages("emmeans")
+library(emmeans)# for anova compare
+if (!require("lsmeans")) install.packages("lsmeans")
+library(lsmeans) # for anova compare
+if (!require("multcompView")) install.packages("multcompView")
+library(multcompView)# for anova compare
+if (!require("multcomp")) install.packages("multcomp")
+library("multcomp")# for anova compare
+if (!require("epitools")) install.packages("epitools")
+library(epitools) # For RR (Risk ratio)
+if (!require("corrplot")) install.packages("corrplot")
+library(corrplot) # for cor plots
+if (!require("skimr")) install.packages("skimr")
+library(skimr)
+if (!require("epiR")) install.packages("epiR")
+library(epiR)
+if (!require("ISLR")) install.packages("ISLR")
+library(ISLR)
+if (!require("cluster")) install.packages("cluster")
+library(cluster)    # clustering algorithms
+if (!require("factoextra")) install.packages("factoextra")
+library(factoextra) # clustering algorithms & visualization
+if (!require("dendextend")) install.packages("dendextend")
+library(dendextend) # clustering visualization
+if (!require("FactoMineR")) install.packages("FactoMineR")
+library(FactoMineR) # PCA algorithms & visualization
+if (!require("ggcorrplot")) install.packages("ggcorrplot")
+library(ggcorrplot) # corplots
+if (!require("Hmisc")) install.packages("Hmisc")
+library(Hmisc)
+
+setwd("~/Documents/SDU/MyRFiles")
 ```
+
+# Lesson 1:
+
+```{r}
+
+student21 <- read_dta("Data/Stud_2021.dta") %>% 
+  janitor::clean_names() 
+
+student21 %>% 
+  count(kon)
+```
+
+# Fix 0, 1 to categories
+
+```{r}
+student21 <- student21 %>% 
+  transmute(student21, kon = ifelse(kon == 0, 'Kvinde','Mand')) 
+  
+student <- student21 %>% 
+  mutate(erhv_arb2 = ifelse(erhv_arb == 0, "Nej", "Ja")) 
+
+```
+
+# Ways to summarise categorical data
+
+```{r}
+student21 %>% 
+  count(kon, sort = TRUE) %>% 
+  mutate(pct = n / nrow(student21) * 100)
+
+
+tabyl(student21$kon, sort = TRUE)
+  
+```
+
+# Function eksempel med gode fif:
+
+```{r}
+# Bla_fun <- function(data, column, label = dolars, ... ) {
+#     data %>% 
+#         mutate(race = fct_reorder(race, {{ column  }}, last )) %>% ## {{to use varible name}}
+#         ggplot(aes(year, {{ column }}, color = race, ...))+ # ... Mulighed for at tilføje
+#         geom_line() +
+#         geom_text(aes(label = race, color = NULL), 
+#                   hjust = 0, data = last_year,
+#                   nudge_x = .2) +
+#         expand_limits(y = 0) +
+#         scale_y_continuous(labels = label)+
+#         labs( x = "Year",
+#               color = "Race")
+#         theme(legend.position = "none")
+# }
+```
+
+------------------------------------------------------------------------
 
 # Exercise 1. T-test - Two independent group
 
 ```{r}
+smoker <- read_dta("Data/KS7_2_BirthW_Smoking.dta") %>% 
+  janitor::clean_names() %>% 
+  mutate(smoking = ifelse(smoking == 1, 'smoker', 'non_smoker'))
 
-smok <- read_dta("Data/KS7_2_BirthW_Smoking.dta") %>% 
-    janitor::clean_names() 
-head(KS7_2_BirthW_Smoking) 
+head(smoker) 
 ```
 
-
 ## a. The scale of the two variables?
+
 ```{r}
-smok %>% 
+smoker %>% 
     summary()
 ```
 
+Smoking er binary. 0 betyder non-smoker, 1 betyder smoker Birth_w går
+fra 2.340 til 4.130 med et mean på 3.408
 
 ## b. Descriptive statistics: Draw by means of Stata a Box plot - what do you see from the plot?
 
+```{r}
+smoker %>% 
+    ggplot(aes( x = birth_w, y = smoking)) +
+    geom_boxplot()
+```
+
+The median weight of the non smokers is 3.6 and for smokers 3.25
+
 ## c. Test: Investigate by means of a hypothesis test in Stata if there is a significant difference in the means among smokers and non-smokers (α = 1%)
+
+```{r}
+alpha = 0.01
+```
 
 including
 
-- what is the reason for using this method?
+-   what is the reason for using this method? We want to compare the
+    mean of two groups.
 
-- assumptions
+## - assumptions
 
-- hypotheses
+### 0) Check CLT conditions.
 
-- test statistic and distribution
+-   Samples are independent - Yes, we assume the samples are
+    independent. Cant be sure because we did not collect the data
 
-- p-value
+-   Sample size is bigger or equal to 30, We got 29 samples. 14 and 15
 
-- what is the conclusion?
+```{r}
+smokers <- smoker %>% 
+    filter(smoking == 'smoker')
+non_smokers <- smoker %>% 
+    filter(smoking == 'non_smoker')
+```
+
+smokers = 14 non_smokers = 15
+
+-   Population distribution is skewed to left. (Not optimal)
+
+```{r}
+ggplot(data = smoker) +
+  geom_density(aes( x = birth_w, fill = smoking), alpha = 0.3) 
+  
+```
+
+### 1) Set-up the hypothesis.
+
+$H_0:$ Difference in mean is 0
+
+$H_A:$ Difference in mean is not 0
+
+### 2) Assume threshold values.
+
+-   $\alpha$-significance level - 0.01 (1%)
+
+### 3) Calculate the Results
+
+```{r}
+t.test(non_smokers$birth_w, smokers$birth_w, conf.level = 0.99, var.equal = T) 
+```
+
+### 4) Draw conclusions
+
+Accept or reject hypothesis
+
+With the t.test and a p_value of 0.0064 we reject the null hypothesis in
+favor of the alternative since the p_value \<1 alpha
 
 ## d. Find a 99 % confidence interval for the difference between the means (see output from question c above)
 
-- Interpret the confidence interval and compare it with the conclusion on the hypothesis test
+### - Interpret the confidence interval and compare it with the conclusion on the hypothesis test
 
-## e. Assumptions: Is Weight normal distributed and are there variance homogeneity (in both groups)? 
+The 99% confidence interval shows us that the difference in mean is as
+low as -0.88390844 and as high as -0.02085347 Since 0 is not part of the
+interval, it confirms our conclusion
+
+## e. Assumptions: Is Weight normal distributed and are there 1 (in both groups)? [1. Two histograms with normal distribution curves (one for each group) and 2. Make the test: Levene Weight, by(Group)
+
+```{r}
+ggplot(data = smoker) +
+  geom_histogram(aes( x = birth_w, y = ..density.., fill = smoking), binwidth = 0.4, position = "dodge") +
+  geom_function(fun = dnorm, args = list(mean = mean(smokers$birth_w), sd = sd(smokers$birth_w)), color = "blue") +
+  geom_function(fun = dnorm, args = list(mean = mean(non_smokers$birth_w), sd = sd(non_smokers$birth_w)), color = "red")     
+      
+```
+
+```{r}
+LT_smoking <- leveneTest(birth_w ~ smoking, data = smoker)
+
+LT_smoking %>% 
+    tidy() %>% 
+    knitr::kable()
+
+glance(LT_smoking)
+
+```
+
+No significant difference in variance.
+
+If the var had ben significant difference we could have made a new
+t.test Now with the assumption that the variance is not equal
+
+```{r}
+t.test(non_smokers$birth_w, smokers$birth_w, conf.level = 0.99) 
+```
+
+------------------------------------------------------------------------
+
+\#Exercise 2. Wilcoxon rank sum test
+
+Data: See description of data set KS7_2 BirthW_Smoking.dta (same data
+set as in exercise 1).
+
+Questions:
+
+## a. Investigate by means of a non-parametric hypothesis test in Stata if there is a significant difference in birth weight of the children among smoking and non-smoking mothers (α = 1 %), including.
+
+### - descriptive statistics (average rank sum)
+
+```{r}
+smoker %>% 
+    group_by(smoking) %>% 
+    summarise(count = n(),
+              median = median(birth_w),
+              variance = var(birth_w),
+              IQR = IQR(birth_w),
+              rank_sum = sum(rank),
+              sd = sd(birth_w)) %>% 
+    knitr::kable()
+```
+
+```{r}
+smoker %>% 
+    ggplot() +
+    geom_boxplot(aes( x = birth_w, y = smoking, fill = smoking), color = "black")
+```
+
+### - when do we use a non-parametric test instead of a parametric test (exercise 1)
+
+When the assumptions are not met:
+
+### - assumptions
+
+    SRS - Dont know
+    Independent obs - Dont know
+    independent Groups - dont know
+    Normality or n>20 - n is small, data does not look normal
+
+### - p-value?
+
+```{r}
+(wilcox_smoking <- wilcox.test(birth_w ~ smoking, data = smoker, conf.int = TRUE, conf.level = 0.99, exact = T, correct = F)) # exact = false vil estimere p værdi
+
+wilcox_smoking$p.value < alpha
+
+```
+
+### - what is the conclusion?
+
+Based on a p-value of 0.009392 we fail to reject the null hypothesis
+
+## b. Compare the result with the result in exercise 1
+
+Difference in p-value. - T-test: 0.007 - Wilcox: 0.01 In the t.test we
+reject null in favor of the alternative In the wilcox we fail to reject
+the null
+
+## c. Do a t-test on the ranks
+
+Calculate the ranks
+
+```{r}
+smoker %>% 
+    arrange(birth_w) %>% 
+    group_by(smoking) %>% 
+    summarise(sum_of_rank = sum(rank))
+
+smoker %>% group_by(smoking) %>%  count()
+(U <- (15*14+(15*(15+1))/2 - 285))
+(U2 <- (15*14+(14*(14+1))/2 - 150))
+```
+
+T-test on ranks
+
+```{r}
+t.test(rank ~ smoking, data = smoker, var.equal = TRUE, detail = T) 
+```
+
+With a p-value of 0.006349 we reject the null in favor of the
+alternative. there is not enough evidence to support the null.
+
+## d. Compare the result with the result in question a
+
+In question A we fail to reject the null. In d we reject the null
+
+------------------------------------------------------------------------
+
+# Exercise 3. T-test - Two dependent groups
+
+Data: See description of data set KS7_3 Sleep_Drug.dta
+
+```{r}
+sleep_drug_wide <- read_dta("Data/KS7_3 Sleep_Drug.dta") %>% 
+    janitor::clean_names() 
+
+sleep_drug <- sleep_drug_wide %>% 
+        pivot_longer(cols = sleep_d:sleep_p,
+                 names_to = "type",
+                 values_to = "hours"
+                 )
+
+
+```
+
+Data is found on e-learn.
+
+The data set contains two numerical variables:
+
+-   SleepD (hours of sleep for the group, that has received a Drug)
+
+-   SleepP (hours of sleep for the group, that has received Placebo)
+
+You can think of this as two variables, where the
+$dependent variable is hours of sleep$, and where
+$the explaining variable expresses two groups (dichotomy)$.
+
+Questions:
+
+## a. Descriptive statistics: Draw by means of Stata a XY plot (scatter plot) with SleepD on the y-axis and SleepP on the x-axis and with a 45-deg-line - what do you see from the plot?
+
+```{r}
+sleep_drug %>% 
+    group_by(type) %>% 
+    summarise(mean = mean(hours), n = n(), 
+              median(hours), 
+              sd = sd(hours), 
+              IQR = IQR(hours)) %>% 
+    knitr::kable()
+
+sleep_drug_wide %>% 
+    ggplot(aes(x = sleep_p, y = sleep_d)) + 
+    geom_point() +
+    geom_abline(intercept = 0, slope = 1) +
+    expand_limits(y = 0, x = 0)
+```
+
+Three points below the 45 deg line and 7 above. This indicates that the
+participants above the 45-deg-line sleeps more after receiving the drug
+than they did before.
+
+```{r}
+sleep_drug %>% 
+    ggplot(aes( x = hours, y = type, fill = type), color = "black" ) +
+    geom_boxplot()
+
+```
+
+## b. Test: Investigate by means of hypothesis test in Stata if the sleeping drug has a significant effect (α = 5 %) including
+
+### - what is the reason for using this method
+
+We use a paired t.test because we have two depend groups
+
+-   assumptions The data is independent.
+
+```{r}
+sleep_drug %>% 
+    group_by(type) %>% 
+    count()
+```
+
+There are 10 in each group
+
+```{r}
+sleep_drug %>% 
+    ggplot()+
+    geom_histogram(aes(x = hours, y = ..density.., fill = type), 
+                   binwidth = 1, position = "dodge", alpha = 0.3) +
+    geom_function(fun = dnorm, args = list(mean = mean(sleep_drug$hours), 
+                                         sd = sd(sleep_drug$hours))) +
+    facet_wrap(~type)
+
+
+sleep_drug %>% 
+    ggplot(aes(sample = hours)) +
+    stat_qq() +
+    stat_qq_line() +
+    facet_wrap(~type)
+```
+
+Sleep_d near normal sleep_p not normal
+
+```{r}
+leveneTest(hours ~ type, data = sleep_drug )
+```
+
+There is no difference in variance (p-value = 0.1197)
+
+\#\#\#- hypotheses
+
+H0: No differnce HA: There is a differnce
+
+\#\#\#- test statistic and distribution
+
+```{r}
+(sleep_drug_test <- t.test(hours ~ type, paired = T, var.equal = T, conf.level = 0.95, data = sleep_drug))
+```
+
+\#\#\#- p-value - what is the conclusion?
+
+With a p-value of 0.17 we fail to reject the null. The evidence is not
+sufficient.
+
+\#\#c. Find a 95% confidence interval for the difference between the two
+means (see output from ques-tion b)
+
+95 percent confidence interval: (-0.5712886 , 2.7312886)
+
+### - Interpret the confidence interval and compare it with the conclusion in question b
+
+Zero is included in the confidence interval confirming our conclusion -
+fail to reject null hypothesis.
+
+## d. Assumptions: Is the difference normal distributed?
+
+```{r}
+sleep_drug_wide %>% 
+    ggplot()+
+    geom_histogram(aes(x = sleep_dp, y = ..density..), 
+                   binwidth = 2, alpha = 0.3) +
+      geom_function(fun = dnorm, args = list(mean = mean(sleep_drug_wide$sleep_dp), 
+                                         sd = sd(sleep_drug_wide$sleep_dp)), 
+                    color = "red")
+
+sleep_drug_wide %>% 
+    ggplot(aes(sample = sleep_dp)) +
+    stat_qq() +
+    stat_qq_line() 
+```
+
+Not normal!
+
+------------------------------------------------------------------------
+
+# Exercise 4. Wilcoxon signed rank test
+
+Data: See description of data set KS7_3 Sleep_Drug.dta.
+
+Data is found on e-learn (same data set as in exercise 3)
+
+Questions:
+
+## a. Descriptive statistics and test: Investigate by means of a non-parametric hypothesis test in Stata if the sleeping drug has a significant effect (α = 5 %) including
+
+### - descriptive statistics (number of positive and negative differences)
+
+```{r}
+sleep_drug %>% 
+    group_by(type) %>% 
+    summarise(mean = mean(hours), 
+              n = n(), 
+              median(hours), 
+              sd = sd(hours), 
+              IQR = IQR(hours),
+              pos_diff = sum(sleep_dp > 0),
+              neg_diff = sum(sleep_dp < 0)) %>%
+    knitr::kable()
+
+```
+
+### - assumptions
+
+-   Can be quantitative or ordinal
+-   The samples are random and independent
+-   with big samples (n1 \>= 10, n2 \>= 10) we can use normal dist
+    approximation.\
+    (exact nay be used)
+
+H0: The distribution are the same Ha: The distribution are different
+\#\#\# - p-value
+
+```{r}
+(sleep_drug_wilcoxtest <- wilcox.test(sleep_drug_wide$sleep_d, 
+                                     sleep_drug_wide$sleep_p, 
+                                     conf.int = TRUE, 
+                                     conf.level = 0.99, paired = T, exact = T))
+
+
+sleep_drug_wilcoxtest$p.value
+```
+
+A p-value of 0.232 \> 0.05
+
+### - what is the conclusion?
+
+We fail to reject the null-hypothesis. There is not enough evidence to
+reject.
+
+## b. Compare the result with the result in exercise 3.
+
+In exercise 3 the paired t.test give a p-value of 0.17 In exercise 4 a
+paired wilcox.test give a p-value of 0.232
+
+Both the test fail to reject the null.
+
+------------------------------------------------------------------------
+
+# Exercise 5. chi2-test
+
+Data: See description of data set KS16_2 Influenza_Vaccine.dta.
+
+```{r}
+influenza_vaccine <- read_dta("Data/KS16_2 Influenza_Vaccine.dta") %>%
+    janitor::clean_names() %>% 
+    mutate(influenza = ifelse(influenza == 1, "influenza", "no_influenza"),
+           vaccine = ifelse(vaccine == 1, "vaccinated", "not_vaccinated"))
+```
+
+Questions:
+
+## a. Is the proportion that gets that gets the flue, significant different in the two groups, that receive the vaccine and placebo? [Comparison of two proportions]
+
+### - what is the reason for using this method
+
+We want to comparison of two proportions therefore we need The
+two-proportions z-test. This is used to compare two observed
+proportions.
+
+### - assumptions
+
+-   independent observations and groups
+-   sufficient sample sizes. p1⋅n1\>5, (1−p1)⋅n1\>5, p2⋅n2\>5,
+    (1−p2)⋅n2\>5
+
+```{r}
+influenza_vaccine %>% 
+    count(influenza, vaccine) %>% 
+    knitr::kable()
+```
+
+### - hypotheses
+
+H0: The proportions are equal
+
+HA: The proportions are different
+
+\#\#\# - test statistic and distribution
+
+```{r}
+tab_flu <- table(factor(influenza_vaccine$vaccine), factor(influenza_vaccine$influenza)) 
+tab_flu %>% 
+    knitr::kable()
+
+barplot(tab_flu, beside = T, legend = T)
+
+test_prop_flue  <-  prop.test(tab_flu, alternative = "two.sided",
+          correct = F) 
+test_prop_flue
+# by default, the function prop.test() used the Yates continuity correction, which is really important if either the expected successes or failures is < 5. If you don’t want the correction, use the additional argument correct = FALSE in prop.test() function. The default value is TRUE. (This option must be set to FALSE to make the test mathematically equivalent to the uncorrected z-test of a proportion.)
+```
+
+the value of Pearson's chi-squared test statistic = 53.008 a p-value =
+3.321e-13 a 95% confidence intervals = (0.2077545 0.3528516) an
+estimated probability of success (the proportion with influenza in the
+two groups) prop 1 prop 2 0.36363636 0.08333333
+
+### - p-value
+P-value of 7.636e-13 
+
+### - what is the conclusion? We reject the null
+in favor of the alternative. There is a significant difference between
+the proportions
+
+## b. Calculate and interpret the Risk ratio (RR)
+
+```{r}
+# If the data is need on a, b, c, d form create a new matix and rearange the values from 
+# the table. TAB2 <- matrix(c(a, b, c, d), nrow = 2, byrow=T)
+rr_tab_flu <- epi.2by2(tab_flu, method = "cohort.count", conf.level = 0.95)
+rr_tab_flu 
+```
+Inc risk ratio is the Realative risk = 4.36, conf.int(95%) = (2.77, 6.87)
+1
+### - Interpret the 95 % confidence interval
+conf.int(95%) = (2.77, 6.87)
+
+Since the value 1 is not part of the conf int the ratio is not significant
+
+## c. Calculate and interpret the (OR)
+
+Odds ratio = 6.29 
+The odds of getting influenza while not vaccinated is 6.29 times the odds of getting it while vaccinated. 
+### - Interpret the 95 % confidence interval
+
+95 percent confidence interval: (3.69, 10.72)
+Since the value 1 is not part of the conf int the ratio is not significant
+
+## d. Are there significant different outcomes with regard to influenza - dependent of if they have re-ceived vaccine or placebo? [Test of equal proportions/Homogeneity]
+
+
+
+### - interpret the distributions of the percentages
+
+### - what is the reason for using this method
+
+### - assumptions
+
+### - hypotheses
+
+### - test statistic and distribution, including the magnitude of the expected values
+
+### - p-value
+
+### - what is the conclusion?
+
+### - interpret the association
+
+### - choose and interpret relevant measures of association
+
+## e. Compare results in question a - d.
+
+------------------------------------------------------------------------
+
+# Exercise 6. Analysis of variance -- One-factor ANOVA
+
+Data: See description of data set Anova_KW.dta.
+
+```{r}
+data_ana <- read_dta("Data/Anova_KW.dta") %>% 
+    janitor::clean_names() 
+
+```
+
+Questions:
+
+## a. Descriptive statistics:
+
+Draw by means of Stata a Box-Whiskers plot - what do you see from the
+plot?
+
+Interpret the descriptive statistics (average and median)
+
+```{r}
+data_ana %>% 
+    ggplot(aes(x = tid, y = type, fill = type), color = "black") +
+    geom_boxplot()
+
+```
+
+```{r}
+data_ana %>% 
+    group_by(type) %>% 
+    summarise(mean = mean(tid),
+              median = median(tid),
+              n = n(), 
+              IQR = IQR(tid),
+              sd = sd(tid)) %>% 
+    knitr::kable()
+```
+
+## b. Assumptions: Normal distribution for each of the three types?
+
+```{r}
+data_ana %>% 
+    ggplot() +
+    geom_histogram(aes(x = tid, y = ..density.., fill = type),binwidth = 10, alpha = 0.3) +
+    geom_function(fun = dnorm, args = list(mean = mean(data_ana$tid), sd = sd(data_ana$tid))) +
+    facet_wrap(~type)
+
+data_ana %>% 
+    ggplot(aes(sample = tid)) +
+    stat_qq() +
+    stat_qq_line() +
+    facet_wrap(~type)
+
+
+```
+
+## c. Test: Investigate by means of hypothesis test in Stata if there is a difference in the effect of the three types of medicine including
+
+### - what is the reason for using this method
+
+### - assumptions
+
+Equal var:
+
+```{r}
+leveneTest(tid ~ type, data = data_ana) %>% 
+    tidy()
+```
+
+### - hypotheses
+
+H0: There is no differnce in mean HA: at lest one mean differs from the
+other
+
+### - check of all the assumptions
+
+### - test statistic and distribution
+
+```{r}
+ana_test <- aov(tid ~ type, data = data_ana) 
+
+ana_test %>% 
+    tidy()%>% 
+    knitr::kable()
+```
+
+### - p-value
+
+```{r}
+ana_test %>% 
+    tidy() %>% 
+    knitr::kable()
+```
+
+' The p_value is 0.0058155
+
+### - what is the conclusion?
+
+We reject the null in favor of the alternative
+
+## e. What type of sleeping medicine is the best/worst (pairwise comparison)?
+
+```{r}
+thsd_ana <- TukeyHSD(ana_test)
+tidy(thsd_ana) %>% 
+    knitr::kable()
+```
+
+Diff or estimate is how far from each other the means are. adj.p.value
+is if the diff is significant.
+
+------------------------------------------------------------------------
+
+# Exercise 7. Kruskal-Wallis test
+
+Data: See description of data set Anova_KW.dta. Questions:
+
+## a. Assumptions and test: Investigate by means of non-parametric hypothesis test in Stata if there is a difference in the effect of the three types of medicine including
+
+### - assumptions
+
+-   We assume that the samples drawn random.
+-   We assume that the observations are independent of each other.´
+-   n\>5 for each group
+
+### - hypotheses
+
+-   H0: all the means are equal, No difference between groups
+-   HA: At least one mean differs from the rest, at least one group is
+    different
+
+### Alpha significant
+
+We chose a alpha significat level of 0.05 (5%)
+
+### - test statistic and distribution
+
+```{r}
+(data_ana_kruskal <- kruskal.test(tid ~ type, data = data_ana))
+```
+
+### - p-value
+
+The p_value is 0.00714002
+
+### - what is the conclusion?
+
+we reject the null in favor of the alternative
+
+## b. Compare the result with the result in exercise 6
+
+In exercise 6 we get a p_value of 0.0058155 in 7 we get 0.007 in both
+cases we reject the null in favor of the alternative. r
+
+## Follow up test DUNN test
+
+```{r}
+dunn_test(tid ~ type, data = data_ana)
+```
+
+------------------------------------------------------------------------
+
+# Exercise 8. Multiple-way ANOVA
+
+Data: See description of data set KS11_1 FEV1.dta.
+
+```{r}
+ks11 <- read_dta("Data/KS11_1 FEV1.dta") %>% 
+    janitor::clean_names()
+
+ks11 <- ks11 %>% 
+    mutate(sex = ifelse(sex == 0, "girl", "boy"),
+           respsymptoms = ifelse(respsymptoms == 0, "no_symptoms", "symptoms"))
+```
+
+Data is found on e-learn.
+
+## a. Descriptive statistics: Draw by means of Stata Box plot with lung capacity in relation to the two sexes and symptoms of respiratory problems -- what do see from the plots?
+
+```{r}
+ks11 %>% 
+    group_by(sex, respsymptoms) %>% 
+    summarise(Count_sex = n(),
+              Mean_age = mean(age),
+              Mean_height = mean(height),
+              Mean_fev1= mean(fev1),
+              SD_fev1 = sd(fev1),
+              IQR_fev1 = IQR(fev1)) %>% 
+    knitr::kable()
+    
+```
+
+```{r}
+ks11 %>% 
+    ggplot(aes(x = fev1, y = sex, color = respsymptoms)) +
+    geom_boxplot()
+```
+
+Also, try to combine the two plots into one plot Finally try in reverse
+order
+
+```{r}
+ks11 %>% 
+    ggplot(aes(x = fev1, y = respsymptoms, color = sex)) +
+    geom_boxplot()
+
+```
+
+The plots shows fev (amount of air exhailed in 1 min) devidied into sex
+and symptoms. The plot shows that boys in general have a higher median
+fev1. The plot also shows that the girls have a larger fall in fev1 with
+symptoms than the boys.
+
+## b. Assumptions and test: Investigate by means of Stata if the interaction is significant different from 0 including
+
+-   Your dependent variable should be continuous -- that is, measured on
+    a scale which can be subdivided using increments (i.e. grams,
+    milligrams)
+-   Your two independent variables should be in categorical, independent
+    groups.
+-   Sample independence -- that each sample has been drawn independently
+    of the other samples
+-   Variance Equality -- That the variance of data in the different
+    groups should be the same
+-   Normality -- That each sample is taken from a normally distributed
+    population
+
+### - test of the assumptions (graphical and "real test")
+
+-   We assume that the variables and the sample is independent.
+
+-   sex is categorical and fev1 is continuous
+
+-   Test for equal variance:
+
+```{r}
+leveneTest(fev1  ~ sex*respsymptoms, data = ks11) %>% 
+    tidy()
+```
+
+The variance is equal
+
+-   Normality
+
+```{r}
+ks11 %>% 
+    group_by(sex) %>% 
+    count()
+```
+
+```{r}
+ks11 %>% 
+    filter(sex == "boy", respsymptoms == "no_symptoms") %>% 
+    ggplot() +
+    geom_histogram(aes(x = fev1,  y = ..density..)) +
+    geom_function(fun = dnorm, 
+                  args = list(mean = mean(ks11$fev1), 
+                              sd = sd(ks11$fev1))) 
+
+ks11 %>% 
+    filter(sex == "girl", respsymptoms == "no_symptoms") %>% 
+    ggplot() +
+    geom_histogram(aes(x = fev1,  y = ..density..)) +
+    geom_function(fun = dnorm, 
+                  args = list(mean = mean(ks11$fev1), 
+                              sd = sd(ks11$fev1))) 
+
+ks11 %>% 
+    filter(sex == "boy", respsymptoms == "symptoms") %>% 
+    ggplot() +
+    geom_histogram(aes(x = fev1,  y = ..density..)) +
+    geom_function(fun = dnorm, 
+                  args = list(mean = mean(ks11$fev1), 
+                              sd = sd(ks11$fev1))) 
+
+ks11 %>% 
+    filter(sex == "girl", respsymptoms == "symptoms") %>% 
+    ggplot() +
+    geom_histogram(aes(x = fev1,  y = ..density..)) +
+    geom_function(fun = dnorm, 
+                  args = list(mean = mean(ks11$fev1), 
+                              sd = sd(ks11$fev1))) 
+```
+
+```{r}
+ks11 %>% 
+    filter(sex == "boy", respsymptoms == "no_symptoms") %>% 
+    ggplot(aes(sample = fev1)) +
+    stat_qq() +
+    stat_qq_line() 
+    
+ks11 %>% 
+    filter(sex == "gril", respsymptoms == "no_symptoms") %>% 
+    ggplot(aes(sample = fev1)) +
+    stat_qq() +
+    stat_qq_line() 
+
+ks11 %>% 
+    filter(sex == "boy", respsymptoms == "symptoms") %>% 
+    ggplot(aes(sample = fev1)) +
+    stat_qq() +
+    stat_qq_line() 
+
+ks11 %>% 
+    filter(sex == "girl", respsymptoms == "symptoms") %>% 
+    ggplot(aes(sample = fev1)) +
+    stat_qq() +
+    stat_qq_line() 
+```
+
+```{r}
+ks11 %>% 
+    filter(sex == "girl", respsymptoms == "no_symptoms") %>% 
+    shapiro_test(fev1)
+ks11 %>% 
+    filter(sex == "boy", respsymptoms == "no_symptoms") %>% 
+    shapiro_test(fev1)
+ks11 %>% 
+    filter(sex == "boy", respsymptoms == "symptoms") %>% 
+    shapiro_test(fev1)
+ks11 %>% 
+    filter(sex == "girl", respsymptoms == "symptoms") %>% 
+    shapiro_test(fev1)
+```
+
+```{r}
+# cal_normal <- function(data, category1, category2){
+    # result <- list()
+    # for (i in names(category1)){
+        # for (j in names(category2)){
+            # ks11 %>% 
+                # filter(sex == {{i}}, respsymptoms == {{j}}) %>% 
+                # result.appaend(shapiro_test(fev1))
+        # }
+    # }
+# }
+
+# nn <- cal_normal(ks11, ks11$sex, ks11$respsymptoms)
+# nn
+```
+
+Data is not normal but close to normal, but since we got so much data we
+carry on with the hypothesis test.
+
+### - hypotheses
+
+H0: The means of all month groups are equal H1: The mean of at least one
+month group is different
+
+H0: The means of the sex and respsymptoms groups are equal H1: The means
+of the sex and respsymptoms groups are different
+
+H0: There is no interaction between sex:respsymptoms H1: There is
+interaction between sex:respsymptoms
+
+### - test statistic and distribution
+
+# nn
+
+I two-way anova betyder + at vi tester effekten af hver værdi og et \*
+betyder interaction mellem de to variabler
+
+```{r}
+ks11_ana_1  <- aov(fev1 ~ sex *respsymptoms, data = ks11)
+
+ks11_ana_1 %>% 
+    tidy()
+```
+
+Looking at the table there is no significanat interaction between sex
+and sex:respsymptoms (p_value = 0.127) - While both sex and respsymptoms
+have a significant influence.
+
+Looking at the residuals:
+
+-   Assumption 1: Normal distribution of the model residuals.
+
+```{r}
+plot(ks11_ana_1,2 )
+```
+
+```{r}
+shapiro.test(ks11_ana_1$residuals)
+```
+
+Not normal!
+
+-   Assumption 2: Homogeneity of the variance of the groups:
+
+```{r}
+plot(ks11_ana_1, 1 )
+```
+
+Looks like equal var
+
+```{r}
+leveneTest(fev1 ~ sex*respsymptoms, data = ks11)
+```
+
+p_value = 0.09, variance is equal.
+
+#### Post-hoc test: In case of a significant interaction effect, we investigate all seperate group combinaitons.
+
+-   We dont have a significant interaction so we dont have to do this
+    test (We do it for the practice)
+
+```{r}
+posthoc_ks11_1 <- lsmeans(ks11_ana_1, 
+        pairwise ~ sex * respsymptoms,
+        adjust = "tukey")
+posthoc_ks11_1 
+    
+
+multcomp::cld(posthoc_ks11_1$contrasts, 
+    alpha = 0.05,
+    Letters = letters) # Means sharing a letter in .group are not significantly different
+
+```
+
+We see that there is significant difference between some of the groups.
+
+### - p-value
+
+(p_value = 0.127)
+
+### - what is the conclusion?
+
+Looking at the table there is no significant interaction between sex and
+sex:respsymptoms
+
+## c. Assumptions and test: Investigate by means of Stata if the main effects are significant dif-ferent from 0
+
+\#\#i. If the interaction effect is significant different from 0,
+continue with output from ques-tion b.
+
+Test:
+
+### - hypotheses
+
+H0: The means of all month groups are equal H1: The mean of at least one
+month group is different
+
+H0: The means of the sex and respsymptoms groups are equal H1: The means
+of the sex and respsymptoms groups are different \#\#\# - assumptions
+
+-   Your dependent variable should be continuous -- that is, measured on
+    a scale which can be subdivided using increments (i.e. grams,
+    milligrams)
+-   Your two independent variables should be in categorical, independent
+    groups.
+-   Sample independence -- that each sample has been drawn independently
+    of the other samples
+-   Variance Equality -- That the variance of data in the different
+    groups should be the same
+-   Normality -- That each sample is taken from a normally distributed
+    population
+
+### - test statistic and distribution
+
+I will redo the anova without interaction:
+
+```{r}
+ks11_ana_sex <- aov(fev1 ~ sex, data = ks11)
+
+ks11_ana_respsymptoms <- aov(fev1 ~ respsymptoms, data = ks11)
+
+ks11_ana_sex %>% 
+    tidy()
+
+ks11_ana_respsymptoms %>% 
+    tidy()
+```
+
+Looking at the residuals:
+
+-   Assumption 1: Normal distribution of the model residuals.
+
+```{r}
+plot(ks11_ana_sex,2 )
+plot(ks11_ana_respsymptoms,2 )
+```
+
+```{r}
+shapiro.test(ks11_ana_sex$residuals)
+shapiro.test(ks11_ana_respsymptoms$residuals)
+```
+
+Not normal!
+
+-   Assumption 2: Homogeneity of the variance of the groups:
+
+```{r}
+plot(ks11_ana_sex, 1 )
+plot(ks11_ana_respsymptoms, 1 )
+```
+
+Looks like equal var
+
+```{r}
+leveneTest(fev1 ~ respsymptoms, data = ks11)
+leveneTest(fev1 ~ sex, data = ks11)
+```
+
+p_value = 0.1014 and 0.2994, variance is equal.
+
+#### Post-hoc test: In case of a significant interaction effect, we investigate all separate group combinations.
+
+Therefore we conduct test for each main effect separately
+
+```{r}
+lsmeans(ks11_ana_sex,
+        pairwise ~ sex)
+# estimate is 0.115 meaning that boys have a higher fev1 
+
+lsmeans(ks11_ana_respsymptoms,
+        pairwise ~ respsymptoms)
+# estimate is 0.145 meaning that there is a higher fev1 in no-symp
+
+
+thsd_aks11_ana_2 <- TukeyHSD(ks11_ana_sex)
+tidy(thsd_aks11_ana_2) %>% 
+    knitr::kable()
+
+thsd_aks11_ana_2 <- TukeyHSD(ks11_ana_respsymptoms)
+tidy(thsd_aks11_ana_2) %>% 
+    knitr::kable()
+```
+
+### - p-value
+
+With a p_value of sex = 0.000000422 and respsymptoms = 0.000000230 Both
+are significant.
+
+### - what is the conclusion?
+
+Both sex and respsymptoms have a significant influence on the test. We
+fail to reject the null hypothesis. No further test is needed.
+
+------------------------------------------------------------------------
+
+# Exercise 9. Correlation analysis and simple linear regression
+
+Data: See description of data set KS11_1 FEV1.dta. Data is found on
+e-learn. Questions:
+
+## a. Descriptive statistics: Draw by means of Stata two XY-plots (scatter plots), that shows the association between fev1 and each of the two variables age and height - include a fitted line
+
+```{r}
+ks11 %>% 
+    ggplot(aes(x = age, y = fev1))+
+    geom_point() +
+    geom_smooth(method = "lm", se = F)
+
+ks11 %>% 
+    ggplot(aes(x = height, y = fev1))+
+    geom_point() +
+    geom_smooth(method = "lm", se = F)
+```
+
+### - why use a scatter plot?
+
+A scatter plot is useful for seeing linear trends. \#\#\# - explain the
+results in the two plot?
+
+## b. Descriptive statistics: Calculate and interpret the correlation coefficients between the three variables, fev1, age and height
+
+Assumptions: - residuals must be normal - mean sum of residuals must be
+0 - variance of residuals must be normal and independt of x - no
+influential observations - no outliers (for each obs Cooks D is
+calculated and must exceed 0)
+
+Correlation diagram: (Is there a linear fit)
+
+```{r}
+if (!require("Hmisc")) install.packages("Hmisc")
+library("Hmisc")
+
+ks11_simple_linear <- ks11 %>% 
+    dplyr::select(fev1, age, height)
+
+
+
+cor_ks11 <- cor(ks11_simple_linear) 
+
+
+corrplot(cor_ks11, method="circle", 
+         type="upper", order="hclust", 
+         addCoef.col = "black", # Add coefficient of correlation
+         tl.col="black", tl.srt=45, #Text label color and rotation
+         # Combine with significance
+         sig.level = 0.01, insig = "blank", 
+         # hide correlation coefficient on the principal diagonal
+         diag=FALSE 
+         )
+
+
+```
+
+correlation coefficient: (r) (The strength of the linear relationship)
+
+```{r}
+rcorr(as.matrix(ks11_simple_linear)) # The output of the function rcorr() is a list containing the following elements : - r : the correlation matrix - n : the matrix of the number of observations used in analyzing each pair of variables - P : the p-values corresponding to the significance levels of correlations.
+```
+
+       fev1  age height
+
+fev1 1.00 0.52 0.64 age 0.52 1.00 0.59 height 0.64 0.59 1.00
+
+Correlation between age and height can mean that they try to explain the
+same thing We want it to be over 0.7
+
+```{r}
+fit_ks11_height <- lm(fev1~height , data = ks11_simple_linear) #Create the linear regression
+
+fit_ks11_height %>% 
+    summary()
+```
+
+## c. Descriptive statistics: Draw by means of Stata a Box plot of fev1 and respectively sex and respsymtoms
+
+```{r}
+ks11 %>% 
+    ggplot(aes(x = fev1, y = sex , color = sex)) +
+    geom_boxplot()+
+    facet_wrap(~respsymptoms)
+```
+
+### - why use a box plot plot?
+
+We dont use scatterplot becasuse of it is categorical \#\#\# - explain
+the results in the two plot?
+
+## d. Test: Investigate by means of a hypothesis test in Stata if there is a significant correlation between fev1 and age including
+
+### - what is the reason for using this method?
+
+We want to test for a correlation between two variables And we have two
+quantitative variables
+
+### - hypotheses with explanation
+
+H0: There is a linear relation between fev1 and age
+
+### - test statistic and distribution and p-value for test of the coefficients
+
+-   Test:
+
+```{r}
+fit_ks11_age <- lm(fev1~age , data = ks11_simple_linear) #Create the linear regression
+
+fit_ks11_age %>% 
+    summary()
+```
+
+intercept with y = .0.3678 slope = 0.2184
+
+r\^2 = 0.26 (0.5 is considered good) r\^2 is how much of the total
+variance is explained by the age p_value = \< 2.2e-16
+
+### - interpretation of the coefficients
+
+Residuals: Min 1Q Median 3Q Max -0.76794 -0.16198 -0.00205 0.16420
+0.90307 \#\#\# - what is the conclusion? The model is not a good fit for
+the data. \#\# e. Check the assumptions. Fulfilled?
+
+Test of Assumptions: - residuals must be normal
+
+```{r}
+plot(fit_ks11_age, 2)
+```
+
+-   mean sum of residuals must be 0 Residuals: Min 1Q Median 3Q Max
+    -0.76794 -0.16198 -0.00205 0.16420 0.90307
+
+-   variance of residuals must be normal and independent of x
+
+```{r}
+plot(fit_ks11_age, 1)
+```
+
+-   no influential observations - no outliers (for each obs Cooks D is
+    calculated and must exceed 0 an below 1)
+
+```{r}
+cooks.distance(fit_ks11_age) %>% 
+    summary()
+
+plot(cooks.distance(fit_ks11_age), pch = 17 , col = "red")
+abline(h = 4/nrow(ks11_simple_linear), col="red") #  I am using the traditional cut-off of 4/nrow
+```
+
+All is below 1 so Cooks D is good!
+
+## f. Use the scatter plot from question a to read the expected value of fev1 at age 9. Calculate in Stata the expected value of fev1 at age 9.
+
+\~ 1.7 aflæst
+
+```{r}
+fit_ks11_age$coefficients
+
+ -0.3677518 + 0.2184394 * 9
+```
+
+## g. Save the do-file for use in exercise 10.
+
+So in summary: Is the R² good? - No Is the assumptions fulfilled - Yes
+is age significant - Yes
+
+We need more predictors
+
+------------------------------------------------------------------------
+
+# Exercise 10. Multiple linear regression (continuation of exercise 9)
+
+Data: See description of data set KS11_1 FEV1.dta. Data is found on
+e-learn. Questions:
+
+```{r}
+skim(ks11)
+```
+
+## a. Descriptive statistics, test and assumptions: Investigate by means of a hypothesis test in Stata if there is a significant correlation between fev1 (outcome variable) and age and height (exposure variable) including
+
+### - what is the reason for using this method?
+
+We have a quantitative variable and we want to investigate if there is a
+linear relation. \#\#\# - descriptive statistics
+
+```{r}
+ks11 %>% 
+    group_by(age, height) %>% 
+    summarise(Count_sex = n(),
+              Mean_age = mean(age),
+              Mean_height = mean(height),
+              Mean_fev1= mean(fev1),
+              SD_fev1 = sd(fev1),
+              IQR_fev1 = IQR(fev1)) %>% 
+    knitr::kable()
+    
+```
+
+```{r}
+ks11 %>% 
+    ggplot(aes(x = age, y = fev1))+
+    geom_point() +
+    geom_smooth(method = "lm", se = F)
+
+ks11 %>% 
+    ggplot(aes(x = height, y = fev1))+
+    geom_point() +
+    geom_smooth(method = "lm", se = F)
+```
+
+```{r}
+ks11_simple_linear <- ks11 %>% 
+    dplyr::select(fev1, age, height)
+
+cor_ks11 <- cor(ks11) 
+
+
+corrplot(cor_ks11, method="circle", 
+         type="upper", order="hclust", 
+         addCoef.col = "black", # Add coefficient of correlation
+         tl.col="black", tl.srt=45, #Text label color and rotation
+         # Combine with significance
+         sig.level = 0.01, insig = "blank", 
+         # hide correlation coefficient on the principal diagonal
+         diag=FALSE 
+         )
+```
+
+### - hypotheses with explanation
+
+H0: There is no relationship between fev1 and age and height ' Beta_age
+= Beta_height = 0 HA: there is a relationship between fev1 and age and
+height Beta_age != Beta_height ! = 0 \#\#\# - test statistic and
+distribution
+
+```{r}
+fit_ks11_m1 <- lm(fev1~age + height , data = ks11_simple_linear) #Create the linear regression
+
+fit_ks11_m1 %>% 
+    summary()
+```
+
+$Y = -2.308601 + 0.089714*x_{age} + 0.024967 * x_{height}$
+
+F-stat = 244.3 2 and 633 df p-value = 2.2e-16 age p = 1.76e-08 height p
+= 2e-16
+
+### - test and interpretation of the coefficients
+
+Overall significant
+
+### - graphical test of the assumptions
+
+VIF (Variation inflation factor) - Detecting multicollinearity VIF = 1
+no multicollinearity VIF \< 10 no serius multicollinearity
+
+```{r}
+car::vif(fit_ks11_m1)
+```
+
+```{r}
+plot(fit_ks11_m1,2)
+shapiro.test(fit_ks11_m1$residuals)
+```
+
+Looks normal but Shapiro indicate that it is significat different from a
+normal dist
+
+```{r}
+bartlett.test(fev1~age + height , data = ks11_simple_linear)
+plot(fit_ks11_m1,1)
+```
+
+Looks linear and the variance seems to be equal.
+
+```{r}
+cooks.distance(fit_ks11_m1) %>% 
+    summary()
+
+plot(cooks.distance(fit_ks11_m1), pch = 17 , col = "red")
+abline(h = 4/nrow(ks11_simple_linear), col="red") #  I am using the traditional cut-off of 4/nrow
+```
+
+All is below 1 so Cooks D is good!
+
+### - conclusion
+
+We reject the null in favor of the alternative. At least one of the
+exposure variable is different.
+
+## b. Compare the results from de two hypothesis tests in exercise 9 and exercise 10, question a.
+
+From ex 9: So in summary: Is the R² good? - No Is the assumptions
+fulfilled - Yes is age significant - Yes
+
+We need more predictors
+
+Ex 10: Is the R² good? - No Is the assumptions fulfilled - Yes is age
+and height significant - Yes
+
+## c. Descriptive statistics, test and assumptions: Investigate by means of hypothesis test in Stata if there is a significant correlation between fev1 (outcome variable) and age, height and sex (exposure variable). Start with descriptive statistics. including
+
+### - what is the reason for using this method?
+
+We have a quantitative variable and we want to investigate if there is a
+linear relation between that and the exposure values quantitative from
+dummy.
+
+```{r}
+ks11 %>% 
+    ggplot(aes(x = age, y = fev1, color = sex)) +
+    geom_point() + 
+    geom_smooth(method = "lm")
+
+ks11 %>% 
+    ggplot(aes(x = height, y = fev1, color = sex)) +
+    geom_point()+ 
+    geom_smooth(method = "lm")
+```
+
+The lines for sex are parallel in both cases indication no interaction.
+
+### - hypotheses with explanation
+
+H0: There is no relationship between fev1 and age and height ' Beta_age
+= Beta_height = 0 HA: there is a relationship between fev1 and age and
+height Beta_age != Beta_height ! = 0
+
+### - test statistic and distribution
+
+```{r}
+fit_ks11_m2 <- lm(fev1~age + height + sex, data = ks11) #Create the linear regression
+
+fit_ks11_m2 %>% 
+    summary()
+```
+
+$y^ = -2.23877 + 0.09459 * x_{age} + 0.02457 * x_{height} - 0.12132 * x_{sexgirl}$
+All is significant Adj R\^2 is 0.47 (bad) F-statistic is 190.7 with 3
+and 632 DF RSE is 0.2211 on 632 DF
+
+from b F-stat = 244.3 2 and 633 df p-value = 2.2e-16 age p = 1.76e-08
+height p = 2e-16
+
+### - test and interpretation of the coefficients
+
+```{r}
+ks_b  <- ks11 %>% 
+    mutate(sex = ifelse(sex == "boy", 0, 1)) %>% 
+    dplyr::select(fev1, age, height, sex)
+
+rcorr(as.matrix(ks_b))
+```
+
+### - graphical test of the assumptions (in the same way as question a.)
+
+```{r}
+plot(fit_ks11_m2,2)
+shapiro.test(fit_ks11_m2$residuals)
+
+```
+
+QQplot looks allmost normal. A bit of diviation at the ends. The Shapiro
+shows that it is sig different from normal.
+
+```{r}
+leveneTest(fit_ks11_m2, center = mean)
+plot(fit_ks11_m2,1)
+```
+
+The red line is almost flat indication linearity The points are
+scattered equal above and below the 0.0 line indication equal variance.
+
+```{r}
+cooks.distance(fit_ks11_m2) %>% 
+    summary()
+
+plot(cooks.distance(fit_ks11_m2), pch = 17 , col = "red")
+abline(h = 4/nrow(ks11_simple_linear), col="red") #  I am using the traditional cut-off of 4/nrow
+```
+
+Cooksd all is below 1 indication no outliers.
+
+### - conclusion
+
+We reject the null in favor of the alternative. All p-values are
+significant.
+
+## d. Compare the results from question a and c.
+
+All is significant Adj R\^2 is 0.47 (bad) F-statistic is 190.7 with 3
+and 632 DF RSE is 0.2211 on 632 DF
+
+From a Residual standard error: 0.4338 F-statistic: 244.3 on 2 and 633
+DF Residual standard error: 0.2291 on 633 DF
+
+So a bit higher R\^2, higher F-statistic and lower RSE
+
+```{r}
+anova(fit_ks11_m1,fit_ks11_m2)
+```
+
+The model is significant better!
+
+## e. Compare four models with different use of sex and age (including interaction) as explaining variables. Compare the coefficients, interpretation and significance, R2, adjusted R2, the assumptions and the expected value of FEV for 9 year old boys
+
+```{r}
+model1_ks <- lm(fev1 ~ age, data = ks11)
+model2_ks <- lm(fev1 ~ sex, data = ks11)
+model3_ks <- lm(fev1 ~ age + sex, data = ks11)
+model4_ks <- lm(fev1 ~ age + sex + age:sex, data = ks11)
+
+summary(model1_ks)
+summary(model2_ks)
+summary(model3_ks)
+summary(model4_ks)
+
+anova(model2_ks, model3_ks)
+anova(model3_ks, model4_ks)
+```
+
+Model 1: -0.3678 + 0.2184 \* age (r\^2 0.2664, adj r² 0.2653) 
+Model 2: 1.65728 + -0.11889 \* sexgirl (r\^2 0.03807, adj r² 0.03656) 
+Model 3: -0.32644 + 0.22143 \* age - 0.12950 \* sexgirl (r\^2 0.3116, adj r²
+0.3094) 
+Model 4: -0.30411 + 0.21894 \* age - 0.17109 \* sexgirl +
+0.00463 \* age \* sexgirl (r\^2 0.3116, adj r² 0.3083)
+
+- - - - - -- - - -- - - -- - - - - - - -- - -  -- - -  - - - - --  - - -- - - -  
+
+# Exercise 11. Logistic regression
+
+Data: See description of data set Cancer1_6_1.dta.
+Data is found on e-learn.
+```{r}
+cancer <- read_dta("Data/Cancer1_6-1.dta") %>% 
+    mutate(sex = ifelse(sex == 1, 'Male', 'Female'),
+           therapy = ifelse(therapy == 1, 'Sequential', 'Alternating'),
+           outcome = ifelse(outcome == 0, 'Progressive disease', ifelse(outcome == 1, 'No change', ifelse(outcome == 3, 'Partial remission', 'Complete remission'))),
+           outcome2 = ifelse(outcome2 == 0, 'Worsening-no change', 'Improvement' ))
+```
+
+Questions:
+### a. 	Create comment a table with therapy and sex in the rows and outcome2 in the columns 
+```{r}
+# Flot
+tab_cancer <- ftable(factor(cancer$therapy),  factor(cancer$sex), factor(cancer$outcome2))
+# Brugbar
+tab_cancer2 <- table(factor(cancer$therapy),  factor(cancer$sex), factor(cancer$outcome2))
+tab_cancer
+```
+
+### b.	Calculate and interpret the odds ratio between outcome2 and therapy 
+
+```{r}
+tab_cancer3 <- ftable(factor(cancer$therapy), factor(cancer$outcome2))
+tab_cancer3
+epi.2by2(tab_cancer3, method = "cohort.count", conf.level = 0.95) 
+```
+                Improvement Worsening-no change
+                                            
+Alternating           62                  89
+Sequential            44                 104
+
+The Odds ratio is 1.65  
+This means that the odds for getting an improvement by using alternating therapy is 65%
+conf int (1.02, 2.66), 1 is not part of the conf.int so rejecting null.
+
+### c. 	Do a logistic regression with outcome2 as the dependent variable and therapy as the explaining variable [OR is part of the output]
+### -	why a logistic regression instead of a linear regression?
+Because we have a qualitative dependent variable. 
+
+### -	interpret OR. Is it significant?
+Doing the Logistic regression.
+```{r}
+cancer_glm.fit <- glm(factor(outcome2) ~ factor(therapy), data = cancer, family = binomial) 
+summary(cancer_glm.fit)
+```
+             Improvement Worsening-no change
+                                            
+Alternating           62                  89
+Sequential            44                 104
+
+getting the OR
+```{r}
+exp(cancer_glm.fit$coefficients)
+```
+(Intercept)         (therapy)Sequential 
+1.435484                1.646578 
+
+With a alpha value of 0.05 the value of therapy is significant
+This means that the odds-ratio for getting an improvement by using Sequential therapy is 64.6% # ER DET HER FORKERT, det er det modsatte af tidligere??
+
+### -	calculate and interpret the probabilities of experience an improvement of the two methods
+
+The probabilities of experience an improvement is for Sequential is 64 % and for alternative 43%
+
+## d. 	Do a logistic regression with outcome2 as the dependent variable and sex as the explaining variable [OR is part of the output]
+```{r}
+cancer_glm.fit_sex <- glm(factor(outcome2) ~ factor(sex), data = cancer, family = binomial) 
+summary(cancer_glm.fit_sex)
+
+exp(cancer_glm.fit_sex$coefficients)
+```
+
+-	why a logistic regression instead of a linear regression?
+	-	interpret OR. Is it significant?
+	With a alpha significant value of 0.05 is:
+	    - The OR for therapy is significant (0.04)
+	    - The OR for sex is not significant (0.07)
+	    This means that the odds-ratio for getting a Worsening-no or no change at 51.9%
+	    
+	-	calculate and interpret the probabilities of experience an improvement of the two                 methods
+
+The probabilities of experience an improvement is for Male is -52% % and for Female 318%
+        
+e.	Do a logistic regression with outcome2 as the dependent variable and therapy and sex as the explaining variables [OR as part of the output]
+```{r}
+cancer_glm.fit_all <- glm(factor(outcome2) ~ factor(therapy) + factor(sex), data = cancer, family = binomial) 
+summary(cancer_glm.fit_sex)
+
+exp(cancer_glm.fit_all$coefficients)
+```
+    
+	-	interpret OR. Is it significant? Calculate and interpret the 95% confidence interval
+	This means that the odds for getting an improvement by using alternating therapy is       65% and the odds-ratio for getting a Worsening-no or no change at 51.9%
+```{r}
+confint(cancer_glm.fit_all)
+```
+                            2.5 %     97.5 %
+(Intercept)                0.23880527 1.67816741
+factor(therapy)Sequential  0.02308618 0.98770302
+factor(sex)Male           -1.42364929 0.04519303
+
+One is part of the conf int of intercept and therefore it is not significant.
+Therapy 1 is not part 
+sex -1 is part of it and therefore it is not significant
+
+f.	What is the probability of improvement in the four groups (the combinations of sex and therapy)?
+	-	interpret the results
+	    Female and Alternative: 251%
+	    Sequential 65%
+	    Male -51%
+	-	draw a plot of the probabilities
+    What plot?
+
+# Exercise 12. Non-linear regression
+
+## Exercise 12a.
+
+Data: See description of data set KS11_1 FEV1.dta.
+Data is found on e-learn.
+
+Questions:
+### a.	Draw a scatter plot of fev1 against age.
+	Is there a linear correlation?
+```{r}
+ks11 %>% 
+ggplot(aes(x = age, y= fev1)) +
+    geom_point() +
+    geom_smooth(method = 'lm', se = F)
+```
+There is no linear relation. The output is too spread. 
+
+### b.	Construct four new variables: Experiment with different models to describe the correlation between fev1 and age. Start with descriptive statistics (plot)
+
+
+### c.	Compare the models. Which one is the ”best” (Look at estimates and significance of the parameters and R2)?
+
+
+## Exercise 12b.
+
+Data: See description of data set R12_6.dta.dta.
+```{r}
+r12 <- read_dta("Data/R12_6.dta") %>% 
+  janitor::clean_names()
+```
+
+Data is found on e-learn.
+
+Questions:
+### a.	Draw a scatter plot of Y against X1, X2, X8 and X9. Is there a linear correlation?
+
+### b.	Experiment with different models to explaining Y, where you do not assume linearity. Start with descriptive statistics (plot)
+
+### c.	Compare the models. Which one is the ”best” (Look at estimates and significance of the parameters and R2)?
+
+
+
+# Exercise 13. Principal component analysis and factor analysis
+
+Data: See a description of the data set Audiometer.dta.
+Data is found on e-learn.
+```{r}
+audiometer <- read_dta("Data/Audiometer.dta") %>% 
+  janitor::clean_names()
+```
+Questions:
+## a.	Descriptive statistics: Is there correlation between the 8 variables?
+```{r}
+audio_cor <- cor(audiometer[,2:9], use = "complete.obs")
+ggcorrplot_clustered <- ggcorrplot(audio_cor, hc.order = TRUE, type = "lower", lab=T)
+ggcorrplot_clustered
+```
+
+```{r}
+# ++++++++++++++++++++++++++++
+# flattenCorrMatrix
+# ++++++++++++++++++++++++++++
+# cormat : matrix of the correlation coefficients
+# pmat : matrix of the correlation p-values
+flattenCorrMatrix <- function(cormat, pmat) {
+  ut <- upper.tri(cormat)
+  data.frame(
+    row = rownames(cormat)[row(cormat)[ut]],
+    column = rownames(cormat)[col(cormat)[ut]],
+    cor  =(cormat)[ut],
+    p = pmat[ut]
+    )
+}
+```
+
+
+```{r}
+audio_cor2 <- rcorr(as.matrix(audiometer[,2:9]))
+audio_cor2 <- flattenCorrMatrix(audio_cor2$r, audio_cor2$P)
+audio_cor2 %>% 
+  arrange(desc(cor)) %>% 
+  filter(cor > 0.5) %>% 
+  knitr::kable()
+```
+There is a good corelation between:
+
+|row   |column |       cor|  p|
+|:-----|:------|---------:|--:|
+|l500  |l1000  | 0.7775422|  0|
+|l1000 |r1000  | 0.7070264|  0|
+|l500  |r500   | 0.6962869|  0|
+|l4000 |r4000  | 0.6782916|  0|
+|r500  |r1000  | 0.6634387|  0|
+|l500  |r1000  | 0.6416175|  0|
+|l2000 |r2000  | 0.5910322|  0|
+|l1000 |r500   | 0.5515407|  0|
+
+
+## b.	Do a pca and discus from the what number of components that may be enough so the model is still ”good”
+```{r}
+audio_pca <- PCA(audiometer[,2:9],  graph = F)
+summary(audio_pca, nbelements = 100)
+```
+
+Plotting the contribution of variable with cosine 
+```{r}
+fviz_pca_var(audio_pca,
+             col.var="contrib",
+             gradient.cols= c("#bb2e00", "#002bbb"),
+             repel = T)
+
+# top 4 
+fviz_pca_var(audio_pca,
+             select.var = list(contrib=4),
+             gradient.cols= c("#bb2e00", "#002bbb"),
+             repel = T)
+
+# Barplot of contribution 
+fviz_contrib(audio_pca, 
+             choice = "var",
+             axes = 1,
+             top = 5)
+
+# plotting cos^2 for individuals:
+fviz_pca_ind(audio_pca,
+             col.ind = "cos2", #select.ind = list(cos2=0.8)
+             gradient_cols = c("#bb2e00", "#002bbb"),
+             repel=T)
+
+#biplot
+fviz_pca_biplot(audio_pca)
+
+# with elipsis
+# fviz_pca_ind(audio_pca,
+#              label = "var",
+#              habillage = #Add A factor here
+#              addEllipses = T)
+```
+
+
+## c.	Do a new pca with the chosen number of components including rotation (varimax) -	why do we make rotation?
+
+## d.	Do a FA with 2 and 3 factors including rotation. Compare the two models -	loadings - uniqueness
+
+## e.	What is the main difference between PCA and FA?
+
+
+
+
+# Exercise 14. Cluster analysis, ANOVA and multiple linear regression
+
+Data: See a description of the data set .Pollution.dta
+```{r}
+pollution <- read_dta("Data/Pollution_15-3.dta") %>% 
+  janitor::clean_names()
+```
+Data is found on e-learn.
+
+Questions:
+## a.	Do a cluster analysis using the variables B, E and F for clustering – including dendrogram
+```{r}
+pollution_red <- pollution %>% 
+  dplyr::select(b, e, f)
+```
+
+```{r}
+pollution_dist <- dist(pollution_red[2:4], method = 'euclidean')
+pollution_clust <- hclust(pollution_dist, method = 'complete')
+pollution_cluster_assignment <- cutree(pollution_clust, k = 3)
+pollution_red <- mutate(pollution_red,  cluster = pollution_cluster_assignment)
+```
+
+```{r}
+kmeans2 <- kmeans(pollution_red, centers = 4, nstart = 25)
+fviz_cluster(kmeans2, data = pollution_red)
+```
+
+
+```{r}
+dend_df <- as.dendrogram(pollution_clust)
+dend_colored <- color_branches(dend_df, k = ) # Or hight h = 
+plot(dend_colored)
+```
+
+```{r}
+pollution_red %>% 
+  group_by(cluster) %>% 
+  summarise(Freq = n(),
+            Bmean = mean(b),
+            Emean = mean(e),
+            Fmean = mean(f)) %>% 
+  knitr::kable()
+```
+
+
+## b.	Create three clusters by doing a new cluster analysis using the variables B, E and F for clustering – including dendrogram 
+
+## Describe the clusters 
+###	- averages of the variables B, E and F
+```{r}
+pollution_red %>% 
+  group_by(cluster) %>% 
+  summarise(Freq = n(),
+            Bmean = mean(b),
+            Emean = mean(e),
+            Fmean = mean(f))
+
+
+```
+###	- averages of the variables C, D and G 
+
+## c.	Do one full ANOVA with A as the dependent variable and the three clusters as independent variables (no interaction effect)
+
+## d.	Do one full multiple linear regression with A as the dependent variable and B to G as the independent variables
+
+
+
+
+# Exercise 15. Poisson regression
+
+Data: See a description of the data set KS24_2 Coronary_deaths.dta.
+```{r}
+ks24 <- read_dta("Data/KS24_2 Coronary_deaths.dta") %>% 
+  janitor::clean_names()
+```
+Data is found on e-learn.
+
+Questions:
+## Does the rate of dying of coronary disease depend on smoking and age (taking into account the person-years in risk)?
+
+### -	model
+
+### -	overall significance?
+
+### -	estimated model
+
+### -	estimated coefficients: Significant? Interpretation?
+
+### -	compare submodels
+
+
